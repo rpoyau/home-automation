@@ -82,6 +82,8 @@ blueprint:
       selector:
         entity:
           domain: scene
+automation:
+  alias: "{{ blueprint.name }}"
   trigger:
     - platform: state
       entity_id:
@@ -99,7 +101,7 @@ blueprint:
   action:
     - choose:
         - conditions:
-            - '{{ is_state(input.dining_presence, "on") }}'
+            - "{{ is_state(input.dining_presence, 'on') }}"
           sequence:
             - service: scene.turn_on
               target:
@@ -107,7 +109,7 @@ blueprint:
               data:
                 transition: !input transition_duration
         - conditions:
-            - '{{ is_state(input.cooking_presence, "on") }}'
+            - "{{ is_state(input.cooking_presence, 'on') }}"
           sequence:
             - service: scene.turn_on
               target:
@@ -115,7 +117,7 @@ blueprint:
               data:
                 transition: !input transition_duration
         - conditions:
-            - '{{ is_state(input.living_presence, "on") }}'
+            - "{{ is_state(input.living_presence, 'on') }}"
           sequence:
             - service: scene.turn_on
               target:
@@ -123,7 +125,7 @@ blueprint:
               data:
                 transition: !input transition_duration
         - conditions:
-            - '{{ is_state(input.stairs_presence, "on") }}'
+            - "{{ is_state(input.stairs_presence, 'on') }}"
           sequence:
             - service: scene.turn_on
               target:
@@ -131,8 +133,7 @@ blueprint:
               data:
                 transition: !input transition_duration
         - conditions:
-            - '{{ is_state(input.upstairs_presence, "on") }}'
-            - '{{ not is_state(input.dining_presence, "on") and not is_state(input.cooking_presence, "on") and not is_state(input.living_presence, "on") and not is_state(input.stairs_presence, "on") }}'
+            - "{{ is_state(input.upstairs_presence, 'on') and not is_state(input.dining_presence, 'on') and not is_state(input.cooking_presence, 'on') and not is_state(input.living_presence, 'on') and not is_state(input.stairs_presence, 'on') }}"
           sequence:
             - service: scene.turn_on
               target:
