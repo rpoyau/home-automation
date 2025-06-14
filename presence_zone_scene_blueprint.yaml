@@ -1,4 +1,4 @@
-¥blueprint:
+blueprint:
   name: Presence-Based Zone Scenes with DND, Luminance, Upstairs Default & Transition
   description: >-
     Control zone-specific scenes based on presence sensors in each zone,
