@@ -11,18 +11,19 @@ blueprint:
     # --- General Controls ---
     dnd_mode:
       name: Do-Not-Disturb Toggle
-      description: When on, this automation is paused.
+      description: Select the input_boolean helper that will pause this automation when 'on'.
       selector:
         entity:
           domain: input_boolean
     luminance_sensor:
       name: Ambient Luminance Sensor
+      description: The sensor that measures ambient light.
       selector:
         entity:
           domain: sensor
     lux_threshold:
       name: Lux Threshold
-      description: Only run when illuminance is below this value.
+      description: The automation will only run when illuminance is below this value.
       default: 50
       selector:
         number:
@@ -37,9 +38,10 @@ blueprint:
         number:
           min: 0
           max: 60
+          unit_of_measurement: s
     all_off_target:
       name: Lights to Turn Off
-      description: The light group or area to turn off when no presence is detected.
+      description: The light group, area, or lights to turn off when no presence is detected.
       selector:
         target:
           entity:
@@ -48,7 +50,7 @@ blueprint:
     # --- Global/Default Layer ---
     upstairs_presence:
       name: Global Upstairs Presence Sensor
-      description: The main sensor that detects if anyone is upstairs.
+      description: The main sensor that detects if anyone is upstairs. This triggers the default scene.
       selector:
         entity:
           domain: binary_sensor
@@ -59,7 +61,7 @@ blueprint:
         entity:
           domain: scene
 
-    # --- Specific Zone Layers (add or remove as needed) ---
+    # --- Specific Zone Layers ---
     dining_presence:
       name: Dining Zone Presence Sensor
       selector:
@@ -80,7 +82,7 @@ blueprint:
       selector:
         entity:
           domain: scene
-    # Add other zones like cooking, stairs, etc., following the same pattern.
+    # To add more zones, copy the two blocks above and change the names (e.g., cooking_presence, scene_cooking).
 
 trigger:
   - platform: state
@@ -88,7 +90,7 @@ trigger:
       - !input upstairs_presence
       - !input dining_presence
       - !input living_presence
-      # Add all other presence sensors here
+      # If you add more zones in the input section, also add their presence sensors here.
     to:
     from:
 
