@@ -1,14 +1,14 @@
 blueprint:
-  name: Presence-Based Zone Scenes with DND, Luminance, Upstairs Default & Transition
+  name: Presence-Based Zone Scenes with DND, Luminance, Upstairs Default & Transition (Corrected)
   description: >-
-    Control zone-specific scenes based on presence sensors in each zone,
-    only when Do-Not-Disturb is off and ambient illuminance is below a threshold,
-    with a default 'upstairs' scene when no specific zone is active, and smooth transitions.
+    Controls zone-specific scenes based on presence. Activates a scene when a zone is occupied
+    and turns lights off when all zones are clear. Only runs when Do-Not-Disturb is off
+    and ambient light is low. Includes a default 'upstairs' scene and smooth transitions.
   domain: automation
   input:
     dnd_mode:
       name: Do-Not-Disturb Mode
-      description: When on, presence-based scene changes are paused
+      description: When on, presence-based scene changes are paused.
       selector:
         boolean: {}
     luminance_sensor:
@@ -18,7 +18,7 @@ blueprint:
           domain: sensor
     lux_threshold:
       name: Lux Threshold
-      description: Only run scenes when illuminance is below this value (lux)
+      description: Only run scenes when illuminance is below this value (lux).
       default: 50
       selector:
         number:
@@ -27,7 +27,7 @@ blueprint:
           unit_of_measurement: lux
     transition_duration:
       name: Transition Duration (seconds)
-      description: Time in seconds to smoothly transition lights when changing scenes
+      description: Time in seconds to smoothly transition lights when changing scenes.
       default: 2
       selector:
         number:
@@ -84,6 +84,13 @@ blueprint:
       selector:
         entity:
           domain: scene
+    scene_all_off:
+      name: All Off Scene
+      description: Scene to activate when no presence is detected anywhere.
+      selector:
+        entity:
+          domain: scene
+
 trigger:
   - platform: state
     entity_id:
@@ -92,16 +99,23 @@ trigger:
       - !input cooking_presence
       - !input living_presence
       - !input stairs_presence
+    # Triggering on both 'on' and 'off' ensures the "all off" state is handled
+    to:
+    from:
+
 condition:
   - condition: template
-    value_template: "{{ not is_state(input.dnd_mode, 'on') }}"
-  - condition: template
-    value_template: >-
-      {{ (states(input.luminance_sensor) | float) < (input.lux_threshold | float) }}
+    value_template: "{{ not dnd_mode }}"
+  - condition: numeric_state
+    entity_id: !input luminance_sensor
+    below: !input lux_threshold
+
 action:
   - choose:
       - conditions:
-          - "{{ is_state(input.dining_presence, 'on') }}"
+          - condition: state
+            entity_id: !input dining_presence
+            state: 'on'
         sequence:
           - service: scene.turn_on
             target:
@@ -109,7 +123,9 @@ action:
             data:
               transition: !input transition_duration
       - conditions:
-          - "{{ is_state(input.cooking_presence, 'on') }}"
+          - condition: state
+            entity_id: !input cooking_presence
+            state: 'on'
         sequence:
           - service: scene.turn_on
             target:
@@ -117,7 +133,9 @@ action:
             data:
               transition: !input transition_duration
       - conditions:
-          - "{{ is_state(input.living_presence, 'on') }}"
+          - condition: state
+            entity_id: !input living_presence
+            state: 'on'
         sequence:
           - service: scene.turn_on
             target:
@@ -125,7 +143,9 @@ action:
             data:
               transition: !input transition_duration
       - conditions:
-          - "{{ is_state(input.stairs_presence, 'on') }}"
+          - condition: state
+            entity_id: !input stairs_presence
+            state: 'on'
         sequence:
           - service: scene.turn_on
             target:
@@ -133,12 +153,20 @@ action:
             data:
               transition: !input transition_duration
       - conditions:
-          - "{{ is_state(input.upstairs_presence, 'on') and not is_state(input.dining_presence, 'on') and not is_state(input.cooking_presence, 'on') and not is_state(input.living_presence, 'on') and not is_state(input.stairs_presence, 'on') }}"
+          - condition: state
+            entity_id: !input upstairs_presence
+            state: 'on'
         sequence:
           - service: scene.turn_on
             target:
               entity_id: !input scene_upstairs
             data:
               transition: !input transition_duration
-    default: []
+    default:
+      - service: scene.turn_on
+        target:
+          entity_id: !input scene_all_off
+        data:
+          transition: !input transition_duration
+
 mode: restart
