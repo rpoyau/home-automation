@@ -38,7 +38,6 @@ blueprint:
         number:
           min: 0
           max: 60
-          unit_of_measurement: s
     all_off_target:
       name: Lights to Turn Off
       description: The light group, area, or lights to turn off when no presence is detected.
@@ -82,7 +81,16 @@ blueprint:
       selector:
         entity:
           domain: scene
-    # To add more zones, copy the two blocks above and change the names (e.g., cooking_presence, scene_cooking).
+    kitchen_presence:
+      name: Kitchen Zone Presence Sensor
+      selector:
+        entity:
+          domain: binary_sensor
+    scene_kitchen:
+      name: Kitchen Zone Scene
+      selector:
+        entity:
+          domain: scene
 
 trigger:
   - platform: state
@@ -90,7 +98,7 @@ trigger:
       - !input upstairs_presence
       - !input dining_presence
       - !input living_presence
-      # If you add more zones in the input section, also add their presence sensors here.
+      - !input kitchen_presence
     to:
     from:
 
@@ -123,6 +131,16 @@ action:
           - service: scene.turn_on
             target:
               entity_id: !input scene_living
+            data:
+              transition: !input transition_duration
+      - conditions:
+          - condition: state
+            entity_id: !input kitchen_presence
+            state: 'on'
+        sequence:
+          - service: scene.turn_on
+            target:
+              entity_id: !input scene_kitchen
             data:
               transition: !input transition_duration
 
