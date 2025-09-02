@@ -1,16 +1,20 @@
 blueprint:
-  name: Presence-Based Zone Scenes with DND, Luminance, Upstairs Default & Transition (Corrected)
+  name: Multi-Layered Presence Scenes with Default and Zone Overrides
   description: >-
-    Controls zone-specific scenes based on presence. Activates a scene when a zone is occupied
-    and turns lights off when all zones are clear. Only runs when Do-Not-Disturb is off
-    and ambient light is low. Includes a default 'upstairs' scene and smooth transitions.
+    Activates specific scenes based on presence in individual zones.
+    When no specific zone is active but general presence is detected, it reverts to a default scene.
+    When all presence is gone, it turns the lights off.
+    Obeys a Do-Not-Disturb toggle and a luminance sensor.
   domain: automation
+
   input:
+    # --- General Controls ---
     dnd_mode:
-      name: Do-Not-Disturb Mode
-      description: When on, presence-based scene changes are paused.
+      name: Do-Not-Disturb Toggle
+      description: When on, this automation is paused.
       selector:
-        boolean: {}
+        entity:
+          domain: input_boolean
     luminance_sensor:
       name: Ambient Luminance Sensor
       selector:
@@ -18,7 +22,7 @@ blueprint:
           domain: sensor
     lux_threshold:
       name: Lux Threshold
-      description: Only run scenes when illuminance is below this value (lux).
+      description: Only run when illuminance is below this value.
       default: 50
       selector:
         number:
@@ -27,25 +31,37 @@ blueprint:
           unit_of_measurement: lux
     transition_duration:
       name: Transition Duration (seconds)
-      description: Time in seconds to smoothly transition lights when changing scenes.
+      description: Time in seconds for smooth light transitions.
       default: 2
       selector:
         number:
           min: 0
           max: 60
-          unit_of_measurement: s
+    all_off_target:
+      name: Lights to Turn Off
+      description: The light group or area to turn off when no presence is detected.
+      selector:
+        target:
+          entity:
+            domain: light
+
+    # --- Global/Default Layer ---
     upstairs_presence:
-      name: Upstairs Presence Sensor
+      name: Global Upstairs Presence Sensor
+      description: The main sensor that detects if anyone is upstairs.
       selector:
         entity:
           domain: binary_sensor
-    scene_upstairs:
+    scene_upstairs_default:
       name: Upstairs Default Scene
+      description: The scene to activate when general presence is detected, but no specific zone is active.
       selector:
         entity:
           domain: scene
+
+    # --- Specific Zone Layers (add or remove as needed) ---
     dining_presence:
-      name: Dining Presence Sensor
+      name: Dining Zone Presence Sensor
       selector:
         entity:
           domain: binary_sensor
@@ -54,18 +70,8 @@ blueprint:
       selector:
         entity:
           domain: scene
-    cooking_presence:
-      name: Cooking Presence Sensor
-      selector:
-        entity:
-          domain: binary_sensor
-    scene_cooking:
-      name: Cooking Zone Scene
-      selector:
-        entity:
-          domain: scene
     living_presence:
-      name: Living Room Presence Sensor
+      name: Living Room Zone Presence Sensor
       selector:
         entity:
           domain: binary_sensor
@@ -74,44 +80,29 @@ blueprint:
       selector:
         entity:
           domain: scene
-    stairs_presence:
-      name: Stairs Presence Sensor
-      selector:
-        entity:
-          domain: binary_sensor
-    scene_stairs:
-      name: Stairs Zone Scene
-      selector:
-        entity:
-          domain: scene
-    scene_all_off:
-      name: All Off Scene
-      description: Scene to activate when no presence is detected anywhere.
-      selector:
-        entity:
-          domain: scene
+    # Add other zones like cooking, stairs, etc., following the same pattern.
 
 trigger:
   - platform: state
     entity_id:
       - !input upstairs_presence
       - !input dining_presence
-      - !input cooking_presence
       - !input living_presence
-      - !input stairs_presence
-    # Triggering on both 'on' and 'off' ensures the "all off" state is handled
+      # Add all other presence sensors here
     to:
     from:
 
 condition:
-  - condition: template
-    value_template: "{{ not dnd_mode }}"
+  - condition: state
+    entity_id: !input dnd_mode
+    state: 'off'
   - condition: numeric_state
     entity_id: !input luminance_sensor
     below: !input lux_threshold
 
 action:
   - choose:
+      # --- PRIORITY 1: Check for specific zones first ---
       - conditions:
           - condition: state
             entity_id: !input dining_presence
@@ -124,16 +115,6 @@ action:
               transition: !input transition_duration
       - conditions:
           - condition: state
-            entity_id: !input cooking_presence
-            state: 'on'
-        sequence:
-          - service: scene.turn_on
-            target:
-              entity_id: !input scene_cooking
-            data:
-              transition: !input transition_duration
-      - conditions:
-          - condition: state
             entity_id: !input living_presence
             state: 'on'
         sequence:
@@ -142,16 +123,8 @@ action:
               entity_id: !input scene_living
             data:
               transition: !input transition_duration
-      - conditions:
-          - condition: state
-            entity_id: !input stairs_presence
-            state: 'on'
-        sequence:
-          - service: scene.turn_on
-            target:
-              entity_id: !input scene_stairs
-            data:
-              transition: !input transition_duration
+
+      # --- PRIORITY 2: If no specific zone is active, check for global presence ---
       - conditions:
           - condition: state
             entity_id: !input upstairs_presence
@@ -159,13 +132,14 @@ action:
         sequence:
           - service: scene.turn_on
             target:
-              entity_id: !input scene_upstairs
+              entity_id: !input scene_upstairs_default
             data:
               transition: !input transition_duration
+
+    # --- DEFAULT ACTION: If no presence is detected anywhere, turn everything off ---
     default:
-      - service: scene.turn_on
-        target:
-          entity_id: !input scene_all_off
+      - service: light.turn_off
+        target: !input all_off_target
         data:
           transition: !input transition_duration
 
