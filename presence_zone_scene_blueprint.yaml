@@ -1,5 +1,5 @@
 blueprint:
-  name: "V4: All-in-One Upstairs Lighting"
+  name: "V4.1: All-in-One Upstairs Lighting (Corrected)"
   description: >-
     A single blueprint for multi-zone presence lighting with adaptive brightness, 
     a TV scene override, and a motion sensor override for the kitchen.
@@ -19,149 +19,110 @@ blueprint:
           entity:
             domain: light
 
+    # --- Luminance Condition ---
+    luminance_sensor:
+      name: Ambient Luminance Sensor
+      description: The automation will only run if this sensor's value is below the threshold.
+      selector:
+        entity:
+          domain: sensor
+    lux_threshold:
+      name: Lux Threshold
+      description: The automation will only run when illuminance is below this value.
+      default: 50
+      selector:
+        number:
+          min: 0
+          max: 10000
+
     # --- Adaptive Brightness Controls ---
     adaptive_brightness_enabled:
       name: Enable Adaptive Brightness
       default: true
       selector:
         boolean: {}
-    luminance_sensors:
-      name: Luminance Sensors
+    luminance_sensors_for_brightness:
+      name: Luminance Sensors for Brightness
+      description: The sensor(s) used to calculate the adaptive brightness level. Can be the same as the main luminance sensor.
       selector:
         entity:
           domain: sensor
           multiple: true
     luminance_aggregation:
       name: Luminance Sensor Aggregation
-      description: How to combine multiple sensor values.
       default: average
       selector:
         select:
-          options:
-            - average
-            - min
-            - max
+          options: [average, min, max]
     lux_for_max_brightness:
       name: Lux for Maximum Brightness
-      description: At or below this lux level, lights will be at maximum brightness.
       default: 10
-      selector:
-        number:
-          min: 0
-          max: 1000
+      selector: { number: { min: 0, max: 1000 } }
     lux_for_min_brightness:
       name: Lux for Minimum Brightness
-      description: At or above this lux level, lights will be at minimum brightness.
       default: 100
-      selector:
-        number:
-          min: 1
-          max: 10000
+      selector: { number: { min: 1, max: 10000 } }
     max_brightness:
       name: Maximum Brightness %
       default: 100
-      selector:
-        number:
-          min: 1
-          max: 100
+      selector: { number: { min: 1, max: 100 } }
     min_brightness:
       name: Minimum Brightness %
       default: 20
-      selector:
-        number:
-          min: 1
-          max: 100
+      selector: { number: { min: 1, max: 100 } }
 
     # --- Global/Default Layer ---
     upstairs_presence:
       name: Global Upstairs Presence Sensor
-      selector:
-        entity:
-          domain: binary_sensor
+      selector: { entity: { domain: binary_sensor } }
     scene_upstairs_default:
       name: Upstairs Default Scene
-      selector:
-        entity:
-          domain: scene
+      selector: { entity: { domain: scene } }
     lights_upstairs_default:
       name: Upstairs Default Light Target
-      selector:
-        target:
-          entity:
-            domain: light
+      selector: { target: { entity: { domain: light } } }
 
     # --- Living Room Layer ---
     living_presence:
       name: Living Room Zone Presence Sensor
-      selector:
-        entity:
-          domain: binary_sensor
+      selector: { entity: { domain: binary_sensor } }
     scene_living_normal:
       name: Living Room Normal Scene
-      description: The scene for the living room when the TV is OFF.
-      selector:
-        entity:
-          domain: scene
+      selector: { entity: { domain: scene } }
     scene_tv:
       name: Living Room TV Scene
-      description: The special scene for the living room when the TV is ON.
-      selector:
-        entity:
-          domain: scene
+      selector: { entity: { domain: scene } }
     lights_living:
       name: Living Room Light Target
-      description: The lights to adjust brightness for the normal scene.
-      selector:
-        target:
-          entity:
-            domain: light
+      selector: { target: { entity: { domain: light } } }
     tv_mode_entity:
       name: TV Media Player Entity
-      selector:
-        entity:
-          domain: media_player
+      selector: { entity: { domain: media_player } }
 
     # --- Dining Room Layer ---
     dining_presence:
       name: Dining Room Zone Presence Sensor
-      selector:
-        entity:
-          domain: binary_sensor
+      selector: { entity: { domain: binary_sensor } }
     scene_dining:
       name: Dining Room Scene
-      selector:
-        entity:
-          domain: scene
+      selector: { entity: { domain: scene } }
     lights_dining:
       name: Dining Room Light Target
-      selector:
-        target:
-          entity:
-            domain: light
+      selector: { target: { entity: { domain: light } } }
 
     # --- Kitchen Layer ---
     kitchen_presence:
       name: Kitchen Zone Presence Sensor
-      selector:
-        entity:
-          domain: binary_sensor
+      selector: { entity: { domain: binary_sensor } }
     kitchen_motion:
       name: Kitchen Linger Motion Sensor
-      description: A simple motion sensor to keep the kitchen active if the main presence sensor misses you.
-      selector:
-        entity:
-          domain: binary_sensor
+      selector: { entity: { domain: binary_sensor } }
     scene_kitchen:
       name: Kitchen Scene
-      selector:
-        entity:
-          domain: scene
+      selector: { entity: { domain: scene } }
     lights_kitchen:
       name: Kitchen Light Target
-      selector:
-        target:
-          entity:
-            domain: light
+      selector: { target: { entity: { domain: light } } }
 
 trigger:
   - platform: state
@@ -175,40 +136,29 @@ trigger:
     to:
     from:
 
+condition:
+  - condition: state
+    entity_id: !input dnd_mode
+    state: 'off'
+  - condition: numeric_state
+    entity_id: !input luminance_sensor
+    below: !input lux_threshold
+
 variables:
   lux_value: >-
-    {% set sensor_ids = expand(input.luminance_sensors) | map(attribute='entity_id') | list %}
-    {% if not sensor_ids %} 0
-    {% else %}
-      {% set values = sensor_ids | map('states') | map('float', 0) | list %}
-      {% if input.luminance_aggregation == 'average' %} {{ values | average }}
-      {% elif input.luminance_aggregation == 'min' %} {{ values | min }}
-      {% else %} {{ values | max }}
-      {% endif %}
-    {% endif %}
+    {% set sensor_ids = expand(input.luminance_sensors_for_brightness) | map(attribute='entity_id') | list %}
+    {% if not sensor_ids %} 0 {% else %} {% set values = sensor_ids | map('states') | map('float', 0) | list %} {% if input.luminance_aggregation == 'average' %} {{ values | average }} {% elif input.luminance_aggregation == 'min' %} {{ values | min }} {% else %} {{ values | max }} {% endif %} {% endif %}
   target_brightness: >-
-    {% set lux_max_b = input.lux_for_max_brightness | float %}
-    {% set lux_min_b = input.lux_for_min_brightness | float %}
-    {% set max_b = input.max_brightness | float %}
-    {% set min_b = input.min_brightness | float %}
-    {% if lux_value <= lux_max_b %} {{ max_b }}
-    {% elif lux_value >= lux_min_b %} {{ min_b }}
-    {% else %}
-      {% set brightness = max_b - ((lux_value - lux_max_b) / (lux_min_b - lux_max_b)) * (max_b - min_b) %}
-      {{ brightness | round(0) }}
-    {% endif %}
+    {% set lux_max_b = input.lux_for_max_brightness | float %} {% set lux_min_b = input.lux_for_min_brightness | float %} {% set max_b = input.max_brightness | float %} {% set min_b = input.min_brightness | float %} {% if lux_value <= lux_max_b %} {{ max_b }} {% elif lux_value >= lux_min_b %} {{ min_b }} {% else %} {% set brightness = max_b - ((lux_value - lux_max_b) / (lux_min_b - lux_max_b)) * (max_b - min_b) %} {{ brightness | round(0) }} {% endif %}
 
 action:
   - choose:
-      # --- PRIORITY 1: Living Room with TV ON ---
       - conditions:
           - "{{ is_state(input.living_presence, 'on') }}"
           - "{{ is_state(input.tv_mode_entity, 'on') or is_state(input.tv_mode_entity, 'playing') }}"
         sequence:
           - service: scene.turn_on
             target: { entity_id: !input scene_tv }
-
-      # --- PRIORITY 2: Kitchen (with motion override) ---
       - conditions:
           - condition: or
             conditions:
@@ -221,10 +171,7 @@ action:
             then:
               - service: light.turn_on
                 target: !input lights_kitchen
-                data:
-                  brightness_pct: "{{ target_brightness }}"
-
-      # --- PRIORITY 3: Other specific zones ---
+                data: { brightness_pct: "{{ target_brightness }}" }
       - conditions: "{{ is_state(input.living_presence, 'on') }}"
         sequence:
           - service: scene.turn_on
@@ -233,8 +180,7 @@ action:
             then:
               - service: light.turn_on
                 target: !input lights_living
-                data:
-                  brightness_pct: "{{ target_brightness }}"
+                data: { brightness_pct: "{{ target_brightness }}" }
       - conditions: "{{ is_state(input.dining_presence, 'on') }}"
         sequence:
           - service: scene.turn_on
@@ -243,10 +189,7 @@ action:
             then:
               - service: light.turn_on
                 target: !input lights_dining
-                data:
-                  brightness_pct: "{{ target_brightness }}"
-
-      # --- PRIORITY 4: Global Default Scene ---
+                data: { brightness_pct: "{{ target_brightness }}" }
       - conditions: "{{ is_state(input.upstairs_presence, 'on') }}"
         sequence:
           - service: scene.turn_on
@@ -255,10 +198,7 @@ action:
             then:
               - service: light.turn_on
                 target: !input lights_upstairs_default
-                data:
-                  brightness_pct: "{{ target_brightness }}"
-    
-    # --- DEFAULT ACTION: All Off ---
+                data: { brightness_pct: "{{ target_brightness }}" }
     default:
       - service: light.turn_off
         target: !input all_off_target
